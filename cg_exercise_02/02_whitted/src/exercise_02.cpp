@@ -9,7 +9,7 @@
 #include <cglib/rt/render_data.h>
 
 /*
- * TODO: implement a ray-sphere intersection test here.
+ * DONE: implement a ray-sphere intersection test here.
  * The sphere is defined by its center and radius.
  *
  * Return true, if (and only if) the ray intersects the sphere.
@@ -25,9 +25,23 @@ bool intersect_sphere(
     float* t)                       // output parameter which contains distance to the hit point
 {
     cg_assert(t);
-	cg_assert(std::fabs(glm::length(ray_direction) - 1.f) < EPSILON);
+    cg_assert(std::fabs(glm::length(ray_direction) - 1.f) < EPSILON);
 
-    return false;
+    glm::vec3 oc = ray_origin - center;
+    float a = glm::dot(ray_direction, ray_direction);
+    float b = 2.0 * glm::dot(oc, ray_direction);
+    float c = glm::dot(oc,oc) - radius*radius;
+    float discriminant = b*b - 4*a*c;
+    if(discriminant < 0){
+        return false;
+    }
+    else{
+        *t = (-b - sqrt(discriminant)) / (2.0*a);
+        if(*t < 0){
+            return false;
+        }
+        return true;
+    }
 }
 
 /*
@@ -39,8 +53,8 @@ glm::vec3 SpotLight::getEmission(
 {
 	cg_assert(std::fabs(glm::length(omega) - 1.f) < EPSILON);
  
-	// TODO: implement a spotlight emitter as specified on the exercise sheet
-	return glm::vec3(0.f);
+	// DONE: implement a spotlight emitter as specified on the exercise sheet
+	return power * (falloff + 2) * (float)pow(fmax(0, glm::dot(direction, omega * -1.f)),falloff);
 }
 
 glm::vec3 evaluate_phong(
@@ -58,33 +72,49 @@ glm::vec3 evaluate_phong(
 	// iterate over lights and sum up their contribution
 	for (auto& light_uptr : data.context.get_active_scene()->lights) 
 	{
-		// TODO: calculate the (normalized) direction to the light
+		// DONE: calculate the (normalized) direction to the light
 		const Light *light = light_uptr.get();
-		glm::vec3 L(0.0f, 1.0f, 0.0f);
+		glm::vec3 L = light->getPosition();
+        glm::vec3 lightDir = glm::normalize(L - P);
+        float cosTheta = glm::dot(N, lightDir);
 
 		float visibility = 1.f;
 		if (data.context.params.shadows) {
-			// TODO: check if light source is visible
+		    if(!visible(data, L, P)){
+                visibility = 0.f;
+		    }
+			// DONE: check if light source is visible
 		}
 
 		glm::vec3 diffuse(0.f);
 		if (data.context.params.diffuse) {
-			// TODO: compute diffuse component of phong model
+		    diffuse = mat.k_d * (float)fmax(0, cosTheta);
+			// DONE: compute diffuse component of phong model
 		}
 
 		glm::vec3 specular(0.f);
 		if (data.context.params.specular) {
-			// TODO: compute specular component of phong model
+		    float cosPsi = glm::dot(V, glm::reflect(lightDir * -1.f, N));
+		    specular =   mat.k_s * (float)pow(fmax(0, cosPsi),mat.n);
+			// DONE: compute specular component of phong model
 		}
 
-		glm::vec3 ambient = data.context.params.ambient ? mat.k_a : glm::vec3(0.0f);
+        float distanceToLight2 = pow(glm::length(L - P),2);
+		float angleCheck = 0;
+		if(cosTheta > 0){
+            angleCheck = 1;
+		}
 
-		// TODO: modify this and implement the phong model as specified on the exercise sheet
-		contribution += ambient * light->getPower();
+        glm::vec3 IL = (light->getEmission(lightDir) * visibility * angleCheck)/distanceToLight2;
+
+		glm::vec3 ambient = data.context.params.ambient ? mat.k_a : glm::vec3(0.0f);
+		// DONE: modify this and implement the phong model as specified on the exercise sheet
+		contribution += IL * (diffuse + specular) + ambient * light->getPower() / distanceToLight2;
 	}
 
 	return contribution;
 }
+
 
 glm::vec3 evaluate_reflection(
 	RenderData &data,			// class containing raytracing information
@@ -93,8 +123,10 @@ glm::vec3 evaluate_reflection(
 	glm::vec3 const& N,			// normal at the position (already normalized)
 	glm::vec3 const& V)			// view vector (already normalized)
 {
-	// TODO: calculate reflective contribution by constructing and shooting a reflection ray.
-	return glm::vec3(0.f);
+	// DONE: calculate reflective contribution by constructing and shooting a reflection ray.
+	glm::vec3 newDirection = glm::vec3(reflect(V, N));
+	Ray newRay = Ray(glm::vec3(P + data.context.params.ray_epsilon * newDirection), newDirection);
+	return trace_recursive(data, newRay, depth + 1);
 }
 
 glm::vec3 evaluate_transmission(
