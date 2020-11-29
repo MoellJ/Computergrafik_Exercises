@@ -137,8 +137,14 @@ glm::vec3 evaluate_transmission(
 	glm::vec3 const& V,			// view vector (already normalized)
 	float eta)					// the relative refraction index
 {
-	// TODO: calculate transmissive contribution by constructing and shooting a transmission ray.
+
+	// DONE: calculate transmissive contribution by constructing and shooting a transmission ray.
 	glm::vec3 contribution(0.f);
+    glm::vec3 t;
+    if(refract(V, N, eta, &t)){
+        Ray newRay = Ray(glm::vec3(P + data.context.params.ray_epsilon * t), t);
+        contribution = trace_recursive(data, newRay, depth + 1);
+	}
 	return contribution;
 }
 
