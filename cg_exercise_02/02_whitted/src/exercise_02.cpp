@@ -123,6 +123,10 @@ glm::vec3 evaluate_reflection(
 	glm::vec3 const& N,			// normal at the position (already normalized)
 	glm::vec3 const& V)			// view vector (already normalized)
 {
+    if(depth >= data.context.params.max_depth){
+        glm::vec3 contribution(0.f);
+        return contribution;
+    }
 	// DONE: calculate reflective contribution by constructing and shooting a reflection ray.
 	glm::vec3 newDirection = glm::vec3(reflect(V, N));
 	Ray newRay = Ray(glm::vec3(P + data.context.params.ray_epsilon * newDirection), newDirection);
@@ -143,7 +147,7 @@ glm::vec3 evaluate_transmission(
     glm::vec3 t;
     if(refract(V, N, eta, &t)){
         Ray newRay = Ray(glm::vec3(P + data.context.params.ray_epsilon * t), t);
-        contribution = trace_recursive(data, newRay, depth + 1);
+        contribution = trace_recursive(data, newRay, depth);
 	}
 	return contribution;
 }
@@ -157,8 +161,12 @@ glm::vec3 handle_transmissive_material_single_ior(
 	float eta)					// the relative refraction index
 {
 	if (data.context.params.fresnel) {
-		// TODO: replace with proper fresnel handling.
-		return evaluate_transmission(data, depth, P, N, V, eta);
+		// DONE: replace with proper fresnel handling.
+		float F = fresnel(V, N, eta);
+        glm::vec3 contribution(0.f);
+        contribution += evaluate_transmission(data, depth, P, N, V, eta) * (1-F);
+        contribution += evaluate_reflection(data, depth, P, N, V) * F;
+		return contribution;
 	}
 	else {
 		// just regular transmission
@@ -175,8 +183,11 @@ glm::vec3 handle_transmissive_material(
 	glm::vec3 const& eta_of_channel)	// relative refraction index of red, green and blue color channel
 {
 	if (data.context.params.dispersion && !(eta_of_channel[0] == eta_of_channel[1] && eta_of_channel[0] == eta_of_channel[2])) {
-		// TODO: split ray into 3 rays (one for each color channel) and implement dispersion here
+		// DONE: split ray into 3 rays (one for each color channel) and implement dispersion here
 		glm::vec3 contribution(0.f);
+		contribution.x = handle_transmissive_material_single_ior(data, depth, P, N, V, eta_of_channel[0]).x;
+		contribution.y = handle_transmissive_material_single_ior(data, depth, P, N, V, eta_of_channel[1]).y;
+		contribution.z = handle_transmissive_material_single_ior(data, depth, P, N, V, eta_of_channel[2]).z;
 		return contribution;
 	}
 	else {
